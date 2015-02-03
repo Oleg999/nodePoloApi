@@ -1,0 +1,162 @@
+<!DOCTYPE html PUBLIC"-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+        <title>Poloniex BOT</title>
+        <link rel="stylesheet" type="text/css" href="/css">
+        <link rel="icon" href="/favicon.ico" />
+        <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+        <script src="http://mozilla.github.io/nunjucks/files/nunjucks.js"></script>
+        <script src="/socket.io/socket.io.js"></script>
+        <script>
+            var env = new nunjucks.Environment();
+            env.addFilter('format', function (value, fmt) {
+                return fmt.sprintf(value);
+            });
+            env.addFilter('formatdate', function (value, fmt) {
+                return new Date(value).toUTCString();
+            });
+            env.addFilter('timediff', function (value) {
+                var v, v1, d, units, u;
+
+                v = parseInt(value, 10);
+                v1 = new Date().getTime();
+                d = v1 - v;
+                units = [ 's', 'm', 'h', 'd' ];
+                u = 0;
+                d /= 1000;
+
+                if (d > 60) { u++; d /= 60; }
+                if (d > 60) { u++; d /= 60; }
+                if (d > 24) { u++; d /= 60; }
+
+                return d.toFixed(1) + units[u];
+            });
+            env.addFilter('fmtforeignamount', function (value) {
+                var loc = window.location.pathname.split('/');
+                loc = loc[loc.length - 1];
+                loc = loc.substr(loc.indexOf('_') + 1);
+                
+                return ("%0.2f" + loc).sprintf(value)
+            });
+        </script>
+        <script id="page" type="text/template">
+            <div class='head'>
+                <div data-template="head"></div>
+                <div class="status" data-template='status'></div>
+            </div>
+            
+            {% for market in markets %}
+                <div class='infoline' data-template="market" data-market="{{ market }}"></div>
+                <div class='left'>
+                    <div class='openorders' data-template="openorders" data-market="{{ market }}"></div>
+                    <div class='mytrades' data-template="mytrades" data-market="{{ market }}"></div>
+                </div>
+                <div data-chart="{{ market }}" class='content'></div>
+            {% endfor %}
+        </script>
+        <script id="market" type="text/template">
+            <span class="info">
+                &nbsp;
+                <h2 style="display: inline;">{{ symbol }}</h2>
+                <h3 style="display: inline;">{{ amount | format("%0.6f" + symbol) }}</h3>
+                {{ asBTC | format("%0.6fBTC") }}
+
+                <span class="infogreen">{{ avgbuy | format("%0.6fBTC") }}</span>
+                <span class="info">{{ last | format("%0.6fBTC") }}</span>
+                <span class="infored">{{ avgsell | format("%0.6fBTC") }}</span>
+                
+                <span style="float:right;position:relative;top:0.25em;">
+                    <span style="color: lightgrey;"><input type="checkbox" class="inpcheck" checked="checked" data-apply="{{ market }}.showEMA" onFocus='this.blur();'>EMA</span>
+                    <span style="color: lightgrey;"><input type="checkbox" class="inpcheck" checked="checked" data-apply="{{ market }}.showSAR" onFocus='this.blur();'>SAR</span>
+                    <span style="color: lightgrey;"><input type="checkbox" class="inpcheck" checked="checked" data-apply="{{ market }}.showAverages" onFocus='this.blur();'>Averages</span>
+                    <span style="color: lightgrey;"><input type="checkbox" class="inpcheck" checked="checked" data-apply="{{ market }}.showTrades" onFocus='this.blur();'>Trades</span>
+                    <span class="info">candles:</span>
+                    <span style="color: grey;" data-api='chartconfig' data-market='{{ market }}' data-arg='{{ 1000 * 60 * 5 }}'>5min</span>
+                    <span style="color: grey;" data-api='chartconfig' data-market='{{ market }}' data-arg='{{ 1000 * 60 * 15 }}'>15min</span>
+                    <span data-api='chartconfig' data-market='{{ market }}' data-arg='{{ 1000 * 60 * 60 }}' style="margin-right:100px;color: grey;">1h</span>
+                </span>
+            </span>
+        </script>
+        <script id="head" type="text/template">
+            <h1 style="display: inline;">{{ BTC | format("%0.6fBTC") }}</h1>
+            {{ totalBTC | format("%0.6fBTC") }}
+        </script>
+        <script id="status" type="text/template">
+            <table cellpadding=0 cellspacing=0>
+                <tr>
+                    {% for channel, val in cache %}
+                        <td class="info small" bgcolor="{{ val.bg }}" style="border-left:1px solid grey;border-bottom:1px solid grey;padding-left:0.5em;">{{ channel }}</td>
+                        <td class="info small" bgcolor="{{ val.bg }}" align="right" style="border-bottom: 1px solid grey; width:4em;padding-right:0.5em;">{{ val._last | timediff }}</td>
+                        <td>&nbsp;</td>
+                    {% endfor %}
+                </tr>
+            </table>
+            </ul>
+        </script>
+        <script id="openorders" type="text/template">
+            <br />
+            {% for sell in sells %}
+                <div style="color:red; float:left;width: 5.5em;text-align: right;padding-right:0.5em;">{{ sell.amount | format("%0.2f") + sell.symbol }}</div>
+                <div style="text-align: right;padding-right:2em;">{{ sell.rate | format("%0.6fBTC") }}</div>
+                <div style="font-size:0.7em;color:grey;text-align:right;margin-right:3em;">{{ sell.depth | format("%0.6fBTC") }}</div>
+            {% endfor %}
+            {% for buy in buys %}
+                <div style="font-size:0.7em;color:grey;text-align:right;margin-right:3em;">{{ buy.depth | format("%0.6fBTC") }}</div>
+                <div style="color:green; float:left;width: 5.5em;text-align: right;padding-right:0.5em;">{{ buy.amount | format("%0.2f") + buy.symbol }}</div>
+                <div style="text-align:right;padding-right:2em;">{{ buy.rate | format("%0.6fBTC") }}</div>
+            {% endfor %}
+        </script>
+        <script id="mytrades" type="text/template">
+            {% for trade in trades %}
+                <br />
+                <div style="font-size:0.7em;color:lightgrey;padding-left:1em;text-align:right;margin-right:3em;">{{ trade.date | formatdate }}</div>
+                <div style="float:left;width:5.5em;text-align:right;color:{{ "darkgreen" if trade.type == 'buy' else "darkred" }}">{{ trade.amount | format("%0.2f") + trade.symbol }}</div>
+                <div style="text-align:right;padding-right:2em;color:grey;">{{ trade.rate | format("%0.6fBTC") }}</div>
+            {% endfor %}
+        </script>
+        <script id="tooltip" type="text/template">
+            <div style="border-right: 1px solid white;padding:1em;text-align:right;background-color: black;">
+                <div style="font-weight:bold;font-size:1.2em;color:{{ "green" if type == 'buy' else "red" }};">{{ type }}</div>
+                {{ amount | fmtforeignamount }}
+                <br />
+                {{ rate | format("%0.6fBTC") }}
+                <br />
+                <br />
+                <b>rate:</b>
+                <br />
+                {% for cr in tooltip.calcrate %}
+                    {{ cr.method }}(
+                    {% for a in cr.args %}{{ a.v }}{{a.u}} {% endfor %}
+                    )
+                    
+                    => <span class='info'>{{ cr.value | format('%0.6f') }}</span>
+                    <br />
+                {% endfor %}
+                <br />
+                <b>amount:</b>
+                <br />
+                {% for cr in tooltip.calcamount %}
+                    {{ cr.method }}(
+                    {% for a in cr.args %}{{ a.v }}{{a.u}} {% endfor %}
+                    )
+                    
+                    => <span class='info'>{{ cr.value | format('%0.6f') }}</span>
+                    <br />
+                {% endfor %}
+            </div>
+            
+        </script>
+        <script src="/js/string"></script>
+        <script src="/js/olhcSeries"></script>
+        <script src="/js/chart"></script>
+        <script src="js/data"></script>
+    </head>
+
+    <body>
+        
+        <div data-template='page' style="margin:0"></div>
+        
+    </body>
+
+</html>

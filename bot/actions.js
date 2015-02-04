@@ -45,11 +45,11 @@ var actionsDef = [
         loop: [
             {
                 symbol: 'BTC_XMR',
-                type: trade.sarpostype(1000 * 60 * 60, 0.01, 0.05).exec(),
+                type: trade.sarpostype(1000 * 60 * 15, 0.01, 0.05).exec(),
                 amount: trade.totalBTC().percent(5).toSymbol().exec(),
-                rate: trade.sar(1000 * 60 * 60, 0.01, 0.05).orderbook().exec(),
+                rate: trade.sar(1000 * 60 * 15, 0.01, 0.05).orderbook().exec(),
                 toString: function () {
-                    return 'XMR 5% SAR 1h AF=0.01 AFMax=0.05';
+                    return 'XMR 5% SAR 1h ';
                 }
             },
             {
@@ -58,7 +58,7 @@ var actionsDef = [
                 amount: trade.totalBTC().percent(6).ifAvgSell(1.25).ifTarget(35, 1.25).toSymbol().exec(),
                 rate: trade.last().percent(106).orderbook().exec(),
                 toString: function () {
-                    return 'SELL XMR 6%                     ';
+                    return 'SELL XMR 6%   ';
                 }
             },
             {
@@ -67,7 +67,7 @@ var actionsDef = [
                 amount: trade.totalBTC().percent(4).ifAvgSell(1.25).ifTarget(35, 1.25).toSymbol().exec(),
                 rate: trade.last().percent(104).orderbook().exec(),
                 toString: function () {
-                    return 'SELL XMR 4%                     ';
+                    return 'SELL XMR 4%   ';
                 }
             },
             {
@@ -76,7 +76,7 @@ var actionsDef = [
                 amount: trade.totalBTC().percent(1).ifAvgSell(1.25).ifTarget(35, 1.25).toSymbol().exec(),
                 rate: trade.last().percent(102).orderbook().exec(),
                 toString: function () {
-                    return 'SELL XMR 2%                     ';
+                    return 'SELL XMR 2%   ';
                 }
             },
             {
@@ -85,7 +85,7 @@ var actionsDef = [
                 amount: trade.totalBTC().percent(1).ifAvgBuy(1.25).ifTarget(35, 1.25).toSymbol().exec(),
                 rate: trade.last().percent(98).orderbook().exec(),
                 toString: function () {
-                    return 'BUY XMR 2%                      ';
+                    return 'BUY  XMR 2%   ';
                 }
             },
             {
@@ -94,7 +94,7 @@ var actionsDef = [
                 amount: trade.totalBTC().percent(4).ifAvgBuy(1.25).ifTarget(35, 1.25).toSymbol().exec(),
                 rate: trade.last().percent(96).orderbook().exec(),
                 toString: function () {
-                    return 'BUY XMR 4%                      ';
+                    return 'BUY  XMR 4% ';
                 }
             },
             {
@@ -103,7 +103,7 @@ var actionsDef = [
                 amount: trade.totalBTC().percent(6).ifAvgBuy(1.25).ifTarget(35, 1.25).toSymbol().exec(),
                 rate: trade.last().percent(94).orderbook().exec(),
                 toString: function () {
-                    return 'BUY XMR 6%                      ';
+                    return 'BUY  XMR 6%   ';
                 }
             }
         ],

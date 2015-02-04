@@ -10,6 +10,7 @@ var async = require('async');
 var publisher  = require('../lib/publisher'); // SYMBOL.history, balance, SYMBOL.openorders, SYMBOL.orderbook, SYMBOL.mytrades
 var env = {};
 var clc = require('cli-color');
+var _candles = require('../lib/candles');
 
 async.mapSeries(config.markets, function (item, callback) {
     console.log('CANCEL orders', item);
@@ -19,46 +20,6 @@ async.mapSeries(config.markets, function (item, callback) {
 function fmtdate(strdate) {
     var s = strdate.split(/[-: ]/);
     return new Date(parseInt(s[0], 10), parseInt(s[1], 10) - 1, parseInt(s[2], 10), parseInt(s[3], 10), parseInt(s[4], 10), parseInt(s[5], 10));
-}
-
-function _min(arr, cb) {
-    if (arr === null || arr === undefined) { return -1; }
-    var i, mi, v;
-    for (i = 0; i < arr.length; i++) {
-        v = arr[i];
-        if (cb !== undefined) {
-            v = cb(v);
-        }
-        if ((mi === undefined || mi === null || isNaN(mi)) || v < mi) {
-            if (v !== null && v !== undefined && !isNaN(v)) {
-                mi = v;
-            }
-        }
-    }
-    if (mi === undefined || isNaN(mi)) {
-        console.log('_min', mi, JSON.stringify(arr), cb === undefined);
-    }
-    return mi;
-}
-
-function _max(arr, cb) {
-    if (arr === null || arr === undefined) { return 1; }
-    var i, mi, v;
-    for (i = 0; i < arr.length; i++) {
-        v = arr[i];
-        if (cb !== undefined) {
-            v = cb(v);
-        }
-        if ((mi === undefined || mi === null || isNaN(mi)) || v > mi) {
-            if (v !== null && v !== undefined && !isNaN(v)) {
-                mi = v;
-            }
-        }
-    }
-    if (mi === undefined || isNaN(mi)) {
-        console.log('_max', mi, JSON.stringify(arr), cb === undefined);
-    }
-    return mi;
 }
 
 function _modifyorderbook(symbol, rate, amount, bidask) {
@@ -121,84 +82,6 @@ function _removefromorderbook(symbol, rate, bidask) {
     }
 }
 
-function extendindicators(candles, opts) {
-    var ewt, n = 10,                            // ema
-        AF, Max, long, af, ep, hp, lp, reverse, // sar
-        i;
-    
-    candles[candles.length - 1].ema = candles[candles.length - 1].close;
-    
-    AF = 0.01; //acceleration factor
-    Max = 0.05; //max acceleration
-    if (opts.SAR !== undefined) {
-        AF = opts.SAR.AF;
-        Max = opts.SAR.AFMax;
-    }
-    
-    ewt = 2 / (10 + 1);
-    if (opts.EMA !== undefined) {
-        ewt = opts.EMA.EWT;
-    }
-    
-    candles[candles.length - 1].sar = candles[candles.length - 1].close;
-
-    long = true;                            //assume long for initial conditions
-    af = AF;                                //init acelleration factor
-    ep = candles[candles.length - 1].low;   //init extreme point
-    hp = candles[candles.length - 1].high;
-    lp = candles[candles.length - 1].low;
-    
-    for (i = candles.length - 2; i >= 0; i--) {
-        candles[i].ema = ((candles[i].close - candles[i + 1].ema) * ewt) + candles[i + 1].ema;
-
-        if (long) {
-            candles[i].sar = candles[i + 1].sar + af * (hp - candles[i + 1].sar);
-        } else {
-            candles[i].sar = candles[i + 1].sar + af * (lp - candles[i + 1].sar);
-        }
-        
-        reverse = 0;
-        
-        if (long) {
-            if (candles[i].low < candles[i].sar) {
-                long = false;
-                reverse = 1;            //reverse position to short
-                candles[i].sar = hp;    //sar is high point in prev trade
-                lp = candles[i].low;
-                af = AF;
-            }
-        } else {
-            if (candles[i].high > candles[i].sar) {
-                long = true;
-                reverse = 1;            //reverse position to long
-                candles[i].sar = lp;
-                hp = candles[i].high;
-                af = AF;
-            }
-        }
-        
-        candles[i].sarislong = long;
-        
-        if (reverse === 0) {
-            if (long) {
-                if (candles[i].high > hp) {
-                    hp = candles[i].high;
-                    af += AF;
-                    af = _min([af, Max]);
-                }
-                candles[i].sar = _min([candles[i].sar, candles[i + 1].low, i < (candles.length - 2) ? candles[i + 2].low : candles[i + 1].low]);
-            } else {
-                if (candles[i].low < lp) {
-                    lp = candles[i].low;
-                    af = af + AF;
-                    af = _min([af, Max]);
-                }
-                candles[i].sar = _max([candles[i].sar, candles[i + 1].high, i < (candles.length - 2) ? candles[i + 2].high : candles[i + 1].high]);
-            }
-        }
-    }
-}
-
 env._dirtyMyTrades = false;
 env._dirtyOpenOrders = false;
 
@@ -212,75 +95,7 @@ env.dirtyMyTrades = function dirtyMyTrades() {
 
 // { SAR: { AF: arg1, AFMax: arg2 } }
 env.candles = function candles(market, candleWidth, opts) {
-    var result = [], i, candle, first, cur, r, history;
-    
-    history = env.history[market].trades.sort(function (a, b) { return a.date > b.date ? -1 : 1; });
-    
-    for (i = history.length - 1; i >= 0; i--) {
-        if (candle === undefined) {
-            candle = {
-                date: (history[i].date / candleWidth).toFixed(0),
-                open: result.length > 0 ? result[result.length - 1].close : history[i].rate,
-                low: history[i].rate,
-                high: history[i].rate,
-                close: history[i].rate
-            };
-        }
-        
-        candle.close = history[i].rate;
-        if (history[i].rate > candle.high) {
-            candle.high = history[i].rate;
-        }
-        if (history[i].rate < candle.low) {
-            candle.low = history[i].rate;
-        }
-        
-        if (candle.date !== (history[i].date / candleWidth).toFixed(0)) {
-            result[candle.date] = candle;
-            if (first === undefined) { first = candle; }
-            candle = undefined;
-        }
-    }
-
-    if (candle !== undefined) {
-        result[candle.date] = candle;
-    }
-
-    cur = history[history.length - 1].date;
-    candle = first;
-    while (cur < history[0].date) {
-        
-        if (result[(cur / candleWidth).toFixed(0)] === undefined) {
-            result[(cur / candleWidth).toFixed(0)] = {
-                date: (cur / candleWidth).toFixed(0),
-                open: candle.close,
-                low: candle.close,
-                high: candle.close,
-                close: candle.close
-            };
-        }
-        
-        candle = result[(cur / candleWidth).toFixed(0)];
-        
-        cur += candleWidth;
-    }
-    
-    r = [];
-    for (i in result) {
-        if (result.hasOwnProperty(i)) {
-            result[i].date = parseInt(result[i].date, 10) * candleWidth;
-            r.push(result[i]);
-        }
-    }
-    
-    r = r.sort(function (a, b) { return a.date > b.date ? -1 : 1; });
-    r[0].ishot = true;
-        
-    extendindicators(r, opts);
-
-    // console.log('rate', r[0].close, 'sar', r[0].sar);
-
-    return r;
+    return _candles.get(candleWidth, env.history[market].trades, opts);
 };
 
 env.connect = function connect(symbols) {
@@ -376,10 +191,12 @@ env.updateBalance = function updateBalance(callback) {
                     
                     if (env.balance[symbol].available !== parseFloat(balances[symbol].available)) {
                         env._dirtyMyTrades = true;
+                        env._dirtyOpenOrders = true;
                     }
                     
                     if (env.balance[symbol].onOrders !== parseFloat(balances[symbol].onOrders)) {
                         env._dirtyMyTrades = true;
+                        env._dirtyOpenOrders = true;
                     }
                     
                     env.balance[symbol].available = parseFloat(balances[symbol].available);
@@ -512,7 +329,7 @@ env.updateMyTrades = function updateMyTrades(callback) {
 
                         result = [];
                         for (ii = 0; ii < trades[symbol].length; ii++) {
-                            result.push({ type: trades[symbol][ii].type, date: fmtdate(trades[symbol][ii].date).getTime(), rate: parseFloat(trades[symbol][ii].rate), amount: parseFloat(trades[symbol][ii].amount) });
+                            result.push({ orderNumber: trades[symbol][ii].orderNumber, type: trades[symbol][ii].type, date: fmtdate(trades[symbol][ii].date).getTime(), rate: parseFloat(trades[symbol][ii].rate), amount: parseFloat(trades[symbol][ii].amount) });
                         }
                         
                         env.mytrades[symbol].trades = result;

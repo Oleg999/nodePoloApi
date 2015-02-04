@@ -113,7 +113,7 @@ TradeCalculations.prototype.exec = function exec() {
                 if (!!(arg2 && arg2.constructor && arg2.call && arg2.apply)) { arg2 = arg2(env, order, rate); }
                 
                 cdl = env.candles(order.symbol, arg0, { SAR: { AF: arg1, AFMax: arg2 } });
-                cur = cdl[0].sarpostype ? 'buy' : 'sell';
+                cur = cdl[0].sarislong ? 'buy' : 'sell';
                 break;
                     
             case 'totalBTC':
@@ -137,7 +137,7 @@ TradeCalculations.prototype.exec = function exec() {
                     
                 } else {
                     if (cur < min(env.orderbook[order.symbol].asks, getob)) {
-                        tmp = min(env.orderbook[order.symbol].asks) - 0.000001;
+                        tmp = min(env.orderbook[order.symbol].asks, getob) - 0.000001;
                         if (tmp !== undefined && tmp !== null) {
                             cur = tmp;
                         }
@@ -282,7 +282,7 @@ trade.checkTrade = function checkTrade(order, env) {
     order.orderType = type;
     
     rate = order.rate(env, order);
-    if (order.orderRate === undefined || !ismatch(rate, parseFloat(order.orderRate), 0.00001)) {
+    if (order.orderRate === undefined || !ismatch(rate, parseFloat(order.orderRate), 0.000005)) {
         order.orderRate = rate.toFixed(6);
         res = true;
     }
@@ -311,7 +311,7 @@ trade.executeTrade = function executeTrade(callback, order, env) {
                 }
                 env._dirtyOpenOrders = true;
                 o.orderNumber = result.orderNumber;
-                publisher.publish(o.symbol + '.trade.' + o.orderNumber, JSON.stringify(o), 1000 * 60 * 60 * 24);
+                publisher.publish(o.symbol + '.trade.' + o.orderNumber, JSON.stringify(o), 1000 * 60 * 60 * 24 * 7);
                 cb(l + ' took ' + ((new Date().getTime() - start) / 1000) + 's');
             });
         } else {
@@ -325,7 +325,7 @@ trade.executeTrade = function executeTrade(callback, order, env) {
                 }
                 o.orderNumber = result.orderNumber;
                 env._dirtyOpenOrders = true;
-                publisher.publish(o.symbol + '.trade.' + o.orderNumber, JSON.stringify(o), 1000 * 60 * 60 * 24);
+                publisher.publish(o.symbol + '.trade.' + o.orderNumber, JSON.stringify(o), 1000 * 60 * 60 * 24 * 7);
                 cb(l + ' took ' + ((new Date().getTime() - start) / 1000) + 's');
             });
         }

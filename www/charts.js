@@ -6,6 +6,7 @@
 var redis = require('redis');
 var rc  = redis.createClient();
 var async = require('async');
+var _candles = require('../lib/candles');
 
 function Chart(market) {
 }
@@ -41,7 +42,6 @@ Chart.formatorderbook = function formatorderbook(orderbook) {
 Chart.getTradeTooltip = function getTradeTooltip(order, callback) {
     rc.get(order.market + '.trade.' + order.orderNumber, function (error, r) {
         if (error) {
-            console.log('Redis Error: ' + error);
             callback(undefined);
         } else {
             callback(JSON.parse(r));
@@ -49,7 +49,7 @@ Chart.getTradeTooltip = function getTradeTooltip(order, callback) {
     });
 };
 
-Chart.formattrades = function formattrades(openorders, mytrades, callback) {
+Chart.formattrades = function formattrades(market, openorders, mytrades, callback) {
     var result = [], i, maxvol, minvol, color, size, tooltip;
     
     if (openorders === null) {
@@ -57,176 +57,46 @@ Chart.formattrades = function formattrades(openorders, mytrades, callback) {
         return;
     }
     
-    result = async.map(openorders, function (item, callback) {
+    async.map(openorders, function (item, cc2) {
         item.color = item.type === 'buy' ? 'green' : 'red';
         item.size = 5;
         item.order = true;
         
         Chart.getTradeTooltip(item, function (tooltip) {
-            item.tooltip = tooltip;
+            if (tooltip !== null && tooltip !== undefined) {
+                item.tooltip = tooltip;
+            }
 
-            callback(undefined, item);
+            cc2(undefined, item);
         });
     }, function (err, results) {
-        for (i = 0; i < mytrades.trades.length; i++) {
-            color = mytrades.trades[i].type === 'buy' ? 'green' : 'red';
-            size = 3;
+        
+        async.map(mytrades.trades, function (item, cc) {
+            item.color = item.type === 'buy' ? 'green' : 'red';
+            item.size = 3;
+            item.market = market;
+            Chart.getTradeTooltip(item, function (tooltip) {
+                if (tooltip !== null && tooltip !== undefined) {
+                    item.tooltip = tooltip;
+                }
 
-            results.push({ color: color, size: size, amount: mytrades.trades[i].amount, rate: mytrades.trades[i].rate, date: mytrades.trades[i].date, order: false, type: mytrades.trades[i].type });
-        }
-        callback(results);
+                cc(undefined, item);
+            });
+        }, function (err, rs) {
+            callback(results.concat(rs));
+        });
     });
 };
 
 Chart.formatcandelizer = function formatcandelizer(market, history) {
-    var result = [], i, candleWidth, candle, first, cur, r;
+    var candleWidth;
     
     if (Chart.settings[market] === undefined) {
         Chart.settings[market] = { width: 1000 * 60 * 15 };
     }
     candleWidth = Chart.settings[market].width; // 1h
     
-    
-    if (history === null) {
-        return [];
-    }
-    history = history.trades.sort(function (a, b) { return a.date > b.date ? -1 : 1; });
-    
-    for (i = history.length - 1; i >= 0; i--) {
-        if (candle === undefined) {
-            candle = {
-                date: (history[i].date / candleWidth).toFixed(0),
-                open: result.length > 0 ? result[result.length - 1].close : history[i].rate,
-                low: history[i].rate,
-                high: history[i].rate,
-                close: history[i].rate
-            };
-        }
-        
-        candle.close = history[i].rate;
-        if (history[i].rate > candle.high) {
-            candle.high = history[i].rate;
-        }
-        if (history[i].rate < candle.low) {
-            candle.low = history[i].rate;
-        }
-        
-        if (candle.date !== (history[i].date / candleWidth).toFixed(0)) {
-            result[candle.date] = candle;
-            if (first === undefined) { first = candle; }
-            candle = undefined;
-        }
-    }
-
-    if (candle !== undefined) {
-        result[candle.date] = candle;
-    }
-
-    cur = history[history.length - 1].date;
-    candle = first;
-    while (cur < history[0].date) {
-        
-        if (result[(cur / candleWidth).toFixed(0)] === undefined) {
-            result[(cur / candleWidth).toFixed(0)] = {
-                date: (cur / candleWidth).toFixed(0),
-                open: candle.close,
-                low: candle.close,
-                high: candle.close,
-                close: candle.close
-            };
-        }
-        
-        candle = result[(cur / candleWidth).toFixed(0)];
-        
-        cur += candleWidth;
-    }
-    
-    r = [];
-    for (i in result) {
-        if (result.hasOwnProperty(i)) {
-            result[i].date = parseInt(result[i].date, 10) * candleWidth;
-            r.push(result[i]);
-        }
-    }
-    
-    r = r.sort(function (a, b) { return a.date > b.date ? -1 : 1; });
-    r[0].ishot = true;
-    
-    return Chart.extendindicators(r);
-};
-
-Chart.extendindicators = function extendindicators(candles) {
-    
-    var ewt, n = 10,                            // ema
-        AF, Max, long, af, ep, hp, lp, reverse, // sar
-        i;
-    
-    candles[candles.length - 1].ema = candles[candles.length - 1].close;
-    
-    AF = 0.01; //acceleration factor
-    Max = 0.05; //max acceleration
-    
-    ewt = 2 / (10 + 1);
-    
-    candles[candles.length - 1].sar = candles[candles.length - 1].close;
-
-    long = true;                            //assume long for initial conditions
-    af = AF;                                //init acelleration factor
-    ep = candles[candles.length - 1].low;   //init extreme point
-    hp = candles[candles.length - 1].high;
-    lp = candles[candles.length - 1].low;
-    
-    for (i = candles.length - 2; i >= 0; i--) {
-        candles[i].ema = ((candles[i].close - candles[i + 1].ema) * ewt) + candles[i + 1].ema;
-
-        if (long) {
-            candles[i].sar = candles[i + 1].sar + af * (hp - candles[i + 1].sar);
-        } else {
-            candles[i].sar = candles[i + 1].sar + af * (lp - candles[i + 1].sar);
-        }
-        
-        reverse = 0;
-        
-        if (long) {
-            if (candles[i].low < candles[i].sar) {
-                long = false;
-                reverse = 1;            //reverse position to short
-                candles[i].sar = hp;    //sar is high point in prev trade
-                lp = candles[i].low;
-                af = AF;
-            }
-        } else {
-            if (candles[i].high > candles[i].sar) {
-                long = true;
-                reverse = 1;            //reverse position to long
-                candles[i].sar = lp;
-                hp = candles[i].high;
-                af = AF;
-            }
-        }
-        
-        candles[i].sarislong = long;
-        
-        if (reverse === 0) {
-            if (long) {
-                if (candles[i].high > hp) {
-                    hp = candles[i].high;
-                    af += AF;
-                    af = Chart.min([af, Max]);
-                }
-                candles[i].sar = Chart.min([candles[i].sar, candles[i + 1].low, i < (candles.length - 2) ? candles[i + 2].low : candles[i + 1].low]);
-            } else {
-                if (candles[i].low < lp) {
-                    lp = candles[i].low;
-                    af = af + AF;
-                    af = Chart.min([af, Max]);
-                }
-                candles[i].sar = Chart.max([candles[i].sar, candles[i + 1].high, i < (candles.length - 2) ? candles[i + 2].high : candles[i + 1].high]);
-            }
-        }
-    }
-    
-    return candles;
+    return _candles.get(candleWidth, history.trades, { SAR: { AF: 0.01, AFMax: 0.05 }, EMA: { EWT: 2 / (10 + 1)} });
 };
 
 Chart.min = function min(arr, cb) {
@@ -317,7 +187,7 @@ Chart.data = function data(market, callback) {
                                     
                                     openorders = JSON.parse(openorders);
                                     mytrades = JSON.parse(mytrades);
-                                    Chart.formattrades(openorders, mytrades, function (ftrades) {
+                                    Chart.formattrades(market, openorders, mytrades, function (ftrades) {
                                         trades = ftrades;
                                         
                                         if (mytrades === null || mytrades === undefined) {

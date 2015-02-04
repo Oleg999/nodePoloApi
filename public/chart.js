@@ -153,8 +153,7 @@ function setDomain(market) {
         maxvol,
         minvol,
         data,
-        axis,
-        rateTickValues = [];
+        axis;
 
     data = _current[market].data;
     axis = _current[market].axis;
@@ -170,37 +169,32 @@ function setDomain(market) {
     }
     oldest = data.olhc[ccount].date;
     last = data.olhc[0].close;
-    rateTickValues.push(last);
     
-    min = data.min * 0.98;
-    max = data.max * 1.02;
+    min = data.min * 0.95;
+    max = data.max * 1.05;
     
     vmin = d3.min([
         d3.min(data.olhc, function (d) { if (d.date < oldest) { return 999999999; } return d.low; }),
-        d3.min(data.trades, function (d) { if (d.date < oldest) { return 999999999; } return d.rate; }),
         data.avgsell,
         data.avgbuy
-    ]) * 0.98;
+    ]) * 0.95;
     vmax = d3.max([
         d3.max(data.olhc, function (d) { if (d.date < oldest) { return -999999; } return d.high; }),
-        d3.max(data.trades, function (d) { if (d.date < oldest) { return -999999; } return d.rate; }),
         data.avgsell,
         data.avgbuy
-    ]) * 1.02;
+    ]) * 1.05;
     
     if (_current[market].userZoom !== undefined) {
         if (_current[market].userZoom > 10) { _current[market].userZoom = 10; }
         if (_current[market].userZoom < -10) { _current[market].userZoom = -10; }
         
-        if (last > min) {
-            vmin += ((last - vmin) / 100) * _current[market].userZoom * 5;
+        if (((vmax + vmin) / 2) > min) {
+            vmin += ((((vmax + vmin) / 2) - vmin) / 100) * _current[market].userZoom * 5;
         }
-        if (last < max) {
-            vmax -= ((vmax - last) / 100) * _current[market].userZoom * 5;
+        if (((vmax + vmin) / 2) < max) {
+            vmax -= ((vmax - ((vmax + vmin) / 2)) / 100) * _current[market].userZoom * 5;
         }
     }
-    rateTickValues.push(vmin);
-    rateTickValues.push(vmax);
     
     data.rateRange = { min: min, max: max };
     data.rateViewRange = { min: vmin, max: vmax };
@@ -232,7 +226,6 @@ function setDomain(market) {
     for (i = 0; i < data.trades.length; i++) {
         if (data.trades[i].order) {
             data.trades[i].date = data.dateViewRange.max.getTime();
-            rateTickValues.push(data.trades[i].rate);
         }
     }
     
@@ -252,8 +245,6 @@ function setDomain(market) {
             { avgsell: data.avgsell, date: data.dateViewRange.min }
         ];
     }
-    
-    axis.rate.tickValues(rateTickValues);
 
     data.viewport = data.olhc.filter(function (v) { return v.date > oldest; });
 }
@@ -306,7 +297,7 @@ function updateChart(container) {
     }
     if (_current[market].showSAR) {
         for (i = 0; i < data.viewport.length; i++) {
-            scatterdata.push({ size: 1.5, color: 'white', rate: data.viewport[i].sar, date: data.viewport[i].date });
+            scatterdata.push({ size: 4, stroke: 'white', color: 'none', rate: data.viewport[i].sar, date: data.viewport[i].date });
         }
     }
     scatter = svg.selectAll("circle").data(scatterdata);
@@ -324,7 +315,7 @@ function updateChart(container) {
         .on("mousemove", function () {
             return tooltip
                 .style("top", (d3.event.pageY - (parseInt(tooltip.style('height'), 10) / 2)) + "px")
-                .style("right", (margin.right + 10) + "px");
+                .style("left", (d3.event.pageX - parseInt(tooltip.style('width'), 10) - 5) + "px");
         });
 
     scatter

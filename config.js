@@ -4,7 +4,7 @@
 'use strict';
 
 var config = {
-    markets: [ 'BTC_XMR' ]
+    markets: [ 'BTC_XMR' ],
+    HttpPort: 8200
 };
-
 module.exports = config;

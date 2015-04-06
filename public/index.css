@@ -83,7 +83,7 @@ body {
 }
 
 .ohlc-series path {
-    stroke-width: 2;
+    /*stroke-width: 2;*/
 }
 
 text {
@@ -124,13 +124,13 @@ circle {
 }
 
 .bar.up-day {
-    stroke: darkgreen;
+    stroke: #00FF00;
     stroke-width: 1.3;
     shape-rendering: geometricPrecision;
 }
 
 .bar.down-day {
-    stroke: darkred;
+    stroke: #FF0000;
     stroke-width: 1.3;
     shape-rendering: geometricPrecision;
 }

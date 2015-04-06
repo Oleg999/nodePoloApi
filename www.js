@@ -12,7 +12,7 @@ var express = require('express');
 var views = require('./www/views');
 var charts = require('./www/charts');
 var app = express();
-
+var config = require('./config');
 app.use(compress());
 var http = require('http').Server(app);
 var sio = require('socket.io');
@@ -27,7 +27,7 @@ function emitchart(force, v) {
         var sid;
         
         if (force === false && lastchart[v] !== undefined) {
-            if (new Date().getTime() - 1000 < lastchart[v]) {
+            if (new Date().getTime() - 10000 < lastchart[v]) {
                 return;
             }
         }
@@ -49,7 +49,7 @@ function emitview(market, v) {
         }
         
         if (lastview[market][v] !== undefined) {
-            if (new Date().getTime() - 1000 < lastview[market][v]) {
+            if (new Date().getTime() - 10000 < lastview[market][v]) {
                 return;
             }
         }
@@ -170,8 +170,8 @@ io.on('connection', function (socket) {
     });
 });
 
-http.listen(3000, function () {
-    console.log('listening on *:3000');
+http.listen(config.HttpPort, function () {
+    console.log('listening on *:' + config.HttpPort);
 });
 
 sub.on("connect", function () {

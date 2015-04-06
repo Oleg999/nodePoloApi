@@ -96,7 +96,7 @@ Chart.formatcandelizer = function formatcandelizer(market, history) {
     }
     candleWidth = Chart.settings[market].width; // 1h
     
-    return _candles.get(candleWidth, history.trades, { SAR: { AF: 0.01, AFMax: 0.05 }, EMA: { EWT: 2 / (10 + 1)} });
+    return _candles.get(candleWidth, history.trades, { SAR: { AF: 0.002, AFMax: 0.05 }, EMA: { EWT: 2 / (10 + 1)} });
 };
 
 Chart.min = function min(arr, cb) {

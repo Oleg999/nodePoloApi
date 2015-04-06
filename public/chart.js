@@ -258,6 +258,8 @@ function updateChart(container) {
     maps = _current[market].maps;
     data = _current[market].data;
     
+    document.title = market + ' ' + data.olhc[0].close.toFixed(6);
+    
     setDomain(market);
 
     svg = container.select('.svg');

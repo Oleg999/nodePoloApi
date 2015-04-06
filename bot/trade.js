@@ -8,6 +8,8 @@ var poloniex = require('../lib/poloniex');
 var publisher  = require('../lib/publisher'); // SYMBOL.trade
 var trade = {};
 var clc = require('cli-color');
+var current = {};
+var async = require('async');
 
 function min(arr, cb) {
     var i, mi, v;
@@ -153,6 +155,12 @@ TradeCalculations.prototype.exec = function exec() {
                 info.push({method: 'percent', args: [{ v: arg0, u: '%' }], value: cur});
                 break;
             case 'target':
+                    
+                if (env.balance[order.symbol.substr(order.symbol.indexOf('_') + 1)] === undefined) {
+                    console.log(order.symbol.substr(order.symbol.indexOf('_') + 1) + ' is undefined');
+                    throw new Error('undefined symbol: ' + order.symbol.substr(order.symbol.indexOf('_') + 1));
+                }
+                    
                 arg0 = self._actions[i].args[0];
                 if (!!(arg0 && arg0.constructor && arg0.call && arg0.apply)) { arg0 = arg0(env, order, rate); }
                 arg0 = env.balance.totalBTC * (arg0 / 100);
@@ -266,6 +274,52 @@ function ismatch(m1, m2, diff) {
     }
 }
 
+trade.checkCancels = function checkCancels(market, env) {
+    var i;
+    
+    if (env.openorders === undefined) {
+        return false;
+    }
+    
+    for (i = 0; i < env.openorders[market].length; i++) {
+        if (current[env.openorders[market][i].orderNumber] === undefined) {
+            return true;
+        }
+    }
+    
+    return false;
+};
+
+trade.executeCancels = function executeCancels(callback, market, env) {
+    var i, cancels = [], log = '', start = new Date().getTime();
+
+    if (env.openorders === undefined) {
+        callback('');
+        return false;
+    }
+    
+    for (i = 0; i < env.openorders[market].length; i++) {
+        if (current[env.openorders[market][i].orderNumber] === undefined) {
+            cancels.push(env.openorders[market][i].orderNumber);
+        }
+    }
+    
+    async.map(cancels,
+        function (item, cb) {
+            log += ' CANCEL ' + item;
+            poloniex.cancel_order(market, item, cb);
+        },
+        function (err, results) {
+        
+            env._dirtyOpenOrders = true;
+            env.updateOpenOrders(function (l) {
+                callback(l + ' ' + log + ' took ' + ((new Date().getTime() - start) / 1000) + 's');
+            });
+            
+        }
+        );
+};
+
 trade.checkTrade = function checkTrade(order, env) {
     var rate, type, amount, res = false;
     
@@ -282,7 +336,7 @@ trade.checkTrade = function checkTrade(order, env) {
     order.orderType = type;
     
     rate = order.rate(env, order);
-    if (order.orderRate === undefined || !ismatch(rate, parseFloat(order.orderRate), 0.000005)) {
+    if (order.orderRate === undefined || !ismatch(rate, parseFloat(order.orderRate), 0.000001)) {
         order.orderRate = rate.toFixed(6);
         res = true;
     }
@@ -309,6 +363,7 @@ trade.executeTrade = function executeTrade(callback, order, env) {
                 if (err !== undefined) {
                     console.log('\t', err, JSON.stringify(o));
                 }
+                current[result.orderNumber] = 'OPEN';
                 env._dirtyOpenOrders = true;
                 o.orderNumber = result.orderNumber;
                 publisher.publish(o.symbol + '.trade.' + o.orderNumber, JSON.stringify(o), 1000 * 60 * 60 * 24 * 7);
@@ -323,6 +378,7 @@ trade.executeTrade = function executeTrade(callback, order, env) {
                 if (err !== undefined) {
                     console.log('\t', err, JSON.stringify(o));
                 }
+                current[result.orderNumber] = 'OPEN';
                 o.orderNumber = result.orderNumber;
                 env._dirtyOpenOrders = true;
                 publisher.publish(o.symbol + '.trade.' + o.orderNumber, JSON.stringify(o), 1000 * 60 * 60 * 24 * 7);
@@ -332,29 +388,14 @@ trade.executeTrade = function executeTrade(callback, order, env) {
     };
     
     if (order.orderNumber !== undefined) {
-        log += ' CANCEL ' + order.symbol + ' ' + order.orderNumber;
-        poloniex.cancel_order(order.symbol, order.orderNumber, function (err, result) {
-            if (result.error !== undefined) {
-                console.log('\t', result.error);
-            }
-            if (err !== undefined) {
-                console.log('\t', err);
-            }
+        current[order.orderNumber] = undefined;
+    }
 
-            if (order.orderType === undefined) {
-                log += ' DISABLED ' + order.symbol + ' ' + order.orderAmount + ' ' + order.orderRate + 'BTC';
-                callback();
-            } else {
-                setorder(order, start, log, callback);
-            }
-        });
+    if (order.orderType === undefined) {
+        log += ' DISABLED ' + order.symbol + ' ' + order.orderAmount + ' ' + order.orderRate + 'BTC';
+        callback(log);
     } else {
-        if (order.orderType === undefined) {
-            log += ' DISABLED ' + order.symbol + ' ' + order.orderAmount + ' ' + order.orderRate + 'BTC';
-            callback();
-        } else {
-            setorder(order, start, log, callback);
-        }
+        setorder(order, start, log, callback);
     }
 };
 

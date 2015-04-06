@@ -10,8 +10,21 @@
         <script src="/socket.io/socket.io.js"></script>
         <script>
             var env = new nunjucks.Environment();
-            env.addFilter('format', function (value, fmt) {
-                return fmt.sprintf(value);
+            
+            function wincolorizer(v) {
+                if (v > 0) {
+                    return 'green';
+                } else {
+                    return 'red';
+                }
+            }
+            
+            env.addFilter('format', function (value, fmt, colorizer) {
+                var v = fmt.sprintf(value);
+                if (colorizer === 'win') {
+                    v = '<span style="color:' + wincolorizer(value) + '">' + v + '</span>';
+                }
+                return v;
             });
             env.addFilter('formatdate', function (value, fmt) {
                 return new Date(value).toUTCString();
@@ -50,6 +63,7 @@
                 <div class='infoline' data-template="market" data-market="{{ market }}"></div>
                 <div class='left'>
                     <div class='openorders' data-template="openorders" data-market="{{ market }}"></div>
+                    <div class='report' data-template="report" data-market="{{ market }}"></div>
                     <div class='mytrades' data-template="mytrades" data-market="{{ market }}"></div>
                 </div>
                 <div data-chart="{{ market }}" class='content'></div>
@@ -99,13 +113,30 @@
             {% for sell in sells %}
                 <div style="color:red; float:left;width: 5.5em;text-align: right;padding-right:0.5em;">{{ sell.amount | format("%0.2f") + sell.symbol }}</div>
                 <div style="text-align: right;padding-right:2em;">{{ sell.rate | format("%0.6fBTC") }}</div>
-                <div style="font-size:0.7em;color:grey;text-align:right;margin-right:3em;">{{ sell.depth | format("%0.6fBTC") }}</div>
             {% endfor %}
             {% for buy in buys %}
-                <div style="font-size:0.7em;color:grey;text-align:right;margin-right:3em;">{{ buy.depth | format("%0.6fBTC") }}</div>
                 <div style="color:green; float:left;width: 5.5em;text-align: right;padding-right:0.5em;">{{ buy.amount | format("%0.2f") + buy.symbol }}</div>
                 <div style="text-align:right;padding-right:2em;">{{ buy.rate | format("%0.6fBTC") }}</div>
             {% endfor %}
+        </script>
+        <script id="report" type="text/template">
+            <!--
+            <br />
+            &nbsp;&nbsp;&nbsp;NICO<br />
+            <div class="info small">
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;XMR: {{ nico.XMR | format("%0.6fXMR") }}<br />
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BTC: {{ nico.BTC | format("%0.6fBTC") }}<br />
+            </div>
+            <div class="small">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=> {{ nico.current | format("%0.6fBTC", 'win') }}</div>
+            -->
+            <br />
+            &nbsp;&nbsp;&nbsp;FLOWER<br />
+            <div class="info small">
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;XMR:&nbsp;&nbsp; {{ flower.XMR | format("%0.6fXMR") }}<br />
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BTC:&nbsp;&nbsp; {{ flower.BTC | format("%0.6fBTC") }}<br />
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Total: {{ flower.totalBTC | format("%0.6fBTC") }}<br />
+            </div>
+            <div class="small">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=> {{ flower.current | format("%0.6fBTC", 'win') }} {{ flower.percent }}%</div>
         </script>
         <script id="mytrades" type="text/template">
             {% for trade in trades %}

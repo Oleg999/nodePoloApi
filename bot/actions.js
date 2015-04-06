@@ -11,11 +11,20 @@ var actions = [], i, ii;
 
 var markets = config.markets;
 
+var XMRTARGET = 66;
+
 var actionsDef = [
     {
         interval: 1000 * 15,
         title: 'Balance',
         action: env.updateBalance
+    },
+    {
+        interval: 1000,
+        title: 'Cancel',
+        check: trade.checkCancels,
+        loop: markets,
+        action: trade.executeCancels
     },
     {
         interval: 1000 * 60 * 5,
@@ -41,71 +50,64 @@ var actionsDef = [
         action: env.updateHistory
     },
     {
+        interval: 1000 * 10,
         title: 'Trade',
         loop: [
             {
                 symbol: 'BTC_XMR',
-                type: trade.sarpostype(1000 * 60 * 15, 0.01, 0.05).exec(),
-                amount: trade.totalBTC().percent(5).toSymbol().exec(),
-                rate: trade.sar(1000 * 60 * 15, 0.01, 0.05).orderbook().exec(),
-                toString: function () {
-                    return 'XMR 5% SAR 1h ';
-                }
-            },
-            {
-                symbol: 'BTC_XMR',
                 type: 'sell',
-                amount: trade.totalBTC().percent(6).ifAvgSell(1.25).ifTarget(35, 1.25).toSymbol().exec(),
+                amount: trade.totalBTC().percent(6).ifAvgSell(1.25).ifTarget(XMRTARGET, 1.5).toSymbol().exec(),
                 rate: trade.last().percent(106).orderbook().exec(),
                 toString: function () {
-                    return 'SELL XMR 6%   ';
+                    return 'SELL  XMR 6%   ';
                 }
             },
             {
                 symbol: 'BTC_XMR',
                 type: 'sell',
-                amount: trade.totalBTC().percent(4).ifAvgSell(1.25).ifTarget(35, 1.25).toSymbol().exec(),
+                amount: trade.totalBTC().percent(4).ifAvgSell(1.25).ifTarget(XMRTARGET, 1.5).toSymbol().exec(),
                 rate: trade.last().percent(104).orderbook().exec(),
                 toString: function () {
-                    return 'SELL XMR 4%   ';
+                    return 'SELL  XMR 4%   ';
                 }
             },
             {
                 symbol: 'BTC_XMR',
                 type: 'sell',
-                amount: trade.totalBTC().percent(1).ifAvgSell(1.25).ifTarget(35, 1.25).toSymbol().exec(),
+                amount: trade.totalBTC().percent(1).ifAvgSell(1.25).ifTarget(XMRTARGET, 1.5).toSymbol().exec(),
                 rate: trade.last().percent(102).orderbook().exec(),
                 toString: function () {
-                    return 'SELL XMR 2%   ';
+                    return 'SELL  XMR 2%   ';
                 }
             },
             {
                 symbol: 'BTC_XMR',
                 type: 'buy',
-                amount: trade.totalBTC().percent(1).ifAvgBuy(1.25).ifTarget(35, 1.25).toSymbol().exec(),
+                amount: trade.totalBTC().percent(1).ifAvgBuy(1.25).ifTarget(XMRTARGET, 1.5).toSymbol().exec(),
                 rate: trade.last().percent(98).orderbook().exec(),
                 toString: function () {
-                    return 'BUY  XMR 2%   ';
+                    return 'BUY   XMR 2%   ';
                 }
             },
             {
                 symbol: 'BTC_XMR',
                 type: 'buy',
-                amount: trade.totalBTC().percent(4).ifAvgBuy(1.25).ifTarget(35, 1.25).toSymbol().exec(),
+                amount: trade.totalBTC().percent(4).ifAvgBuy(1.25).ifTarget(XMRTARGET, 1.5).toSymbol().exec(),
                 rate: trade.last().percent(96).orderbook().exec(),
                 toString: function () {
-                    return 'BUY  XMR 4% ';
+                    return 'BUY   XMR 4%   ';
                 }
             },
             {
                 symbol: 'BTC_XMR',
                 type: 'buy',
-                amount: trade.totalBTC().percent(6).ifAvgBuy(1.25).ifTarget(35, 1.25).toSymbol().exec(),
+                amount: trade.totalBTC().percent(6).ifAvgBuy(1.25).ifTarget(XMRTARGET, 1.5).toSymbol().exec(),
                 rate: trade.last().percent(94).orderbook().exec(),
                 toString: function () {
-                    return 'BUY  XMR 6%   ';
+                    return 'BUY   XMR 6%   ';
                 }
             }
+            
         ],
         check: trade.checkTrade,
         action: trade.executeTrade
@@ -158,10 +160,10 @@ function next() {
         actions[current].lastrun = (new Date()).getTime();
         action.action(callback, item, env);
     } else {
-        setTimeout(next, 100);
+        setTimeout(next, 1000);
     }
 }
 
-setTimeout(next, 1500);
+setTimeout(next, 2000);
 
 module.exports = actions;

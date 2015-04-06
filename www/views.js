@@ -31,6 +31,60 @@ views.head.exec = function execPage(callback) {
     });
 };
 
+views.report = {};
+views.report.signal = [{ balance: [] }];
+views.report.exec = function execOpenOrders(callback, symbol) {
+    rc.get('balance', function (error, balances) {
+        if (error) {
+            console.log('Redis Error: ' + error);
+            callback({error: error});
+        } else {
+            var result = {
+                total: {
+                    XMR: undefined,
+                    BTC: undefined,
+                    totalBTC: undefined
+                },
+                nico: {
+                    deposit: 0
+                },
+                flower: {
+                    deposit: 0.3
+                }
+            };
+
+            var FLOWER = 0.25;
+            
+            balances = JSON.parse(balances);
+            
+            result.total.XMR = balances.XMR.amount;
+            result.total.BTC = balances.BTC.amount;
+            result.total.totalBTC = balances.totalBTC;
+
+            var mul = result.nico.deposit / (result.nico.deposit + result.flower.deposit); // 0.33
+            result.nico.XMR = result.total.XMR * mul;
+            result.nico.BTC = result.total.BTC * mul;
+            result.nico.totalBTC = result.total.totalBTC * mul;
+            result.nico.current = result.nico.totalBTC - result.nico.deposit;
+            result.nico.percent = 0;
+            // result.nico.percent = parseInt(result.nico.deposit / result.nico.totalBTC * 100);
+
+            if (result.nico.current > 0) {
+                result.nico.current = result.nico.current * (1 - FLOWER);
+            }
+
+            result.flower.XMR = result.total.XMR - result.nico.XMR;
+            result.flower.BTC = result.total.BTC - result.nico.BTC;
+            result.flower.totalBTC = result.total.totalBTC - result.nico.totalBTC;
+            result.flower.current = result.flower.totalBTC - result.flower.deposit;
+            result.flower.percent = parseInt((result.flower.totalBTC / result.flower.deposit) * 100);
+
+            callback(result);
+        }
+    });
+
+};
+
 views.market = {};
 views.market.signal = [{ balance: [], openorders: [], history: [] }];
 views.market.exec = function execOpenOrders(callback, symbol) {

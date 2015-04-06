@@ -21,12 +21,9 @@ olhcSeries.ohlc = function () {
     
     var tickWidth = 7;
     var line = d3.svg.line()
-        .x(function (d) {
-            return d.x;
-        })
-        .y(function (d) {
-            return d.y;
-        });
+        .x(function (d) { return d.x; })
+        .y(function (d) { return d.y; })
+        ;
     
     var highLowLines = function (bars) {
         var paths = bars.selectAll('.high-low-line').data(function (d) {
@@ -44,7 +41,25 @@ olhcSeries.ohlc = function () {
                         x: xScale(d.date),
                         y: yScale(d.low)
                     }
-                ]);
+                ])
+            });
+            paths.attr("stroke-width", function(d) {
+                // 1000 => 6
+                // 0 => 1
+                var t = parseInt(d.volume / 1000) * 6;
+                if (t > 6) { t = 6; }
+                if (t < 1) { t = 1; }
+            
+                return t;
+            });
+            paths.attr("stroke-opacity", function(d) {
+                // 10000 => 100
+                // 0 => 25
+                var t = parseInt(d.volume / 10000) * 100;
+                if (t > 90) { t = 90; }
+                if (t < 33) { t = 33; }
+            
+                return t + '%';
             });
         
     };
@@ -86,6 +101,23 @@ olhcSeries.ohlc = function () {
                     }
                 ]);
             });
+           
+            open.attr("stroke-opacity", function(d) {
+                var t = parseInt(d.volume / 10000) * 100;
+                if (t > 90) { t = 90; }
+                if (t < 33) { t = 33; }
+            
+                return t + '%';
+            });
+            
+            close.attr("stroke-opacity", function(d) {
+                var t = parseInt(d.volume / 10000) * 100;
+                if (t > 90) { t = 90; }
+                if (t < 33) { t = 33; }
+            
+                return t + '%';
+            }); 
+           
         open.exit().remove();
         close.exit().remove();
         

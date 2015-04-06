@@ -99,9 +99,9 @@ env.candles = function candles(market, candleWidth, opts) {
 };
 
 env.connect = function connect(symbols) {
-
+    
     poloniex.connectmarket(symbols, function ticker(symbol, tick) {
-        var i, orderbook = false, history = false;
+        var i, orderbook = false, history = false, fnsort = function (a, b) { return a.date > b.date ? -1 : 1; };
         
         try {
         
@@ -113,9 +113,10 @@ env.connect = function connect(symbols) {
                     _modifyorderbook(symbol, tick[i].data.rate, tick[i].data.amount, tick[i].data.type);
                     orderbook = true;
                 } else if (tick[i].type === 'newTrade') { // BTC_CLAM newTrade { data: { tradeID: '190489', rate: '0.00519751', amount: '0.08551438', date: '2015-01-30 23:53:05', total: '0.00044446', type: 'buy' }, type: 'newTrade' }
-                    console.log(new Date().toLocaleString(), clc.yellow('newTrade'), JSON.stringify(env.history[symbol].trades[0]));
                     env.history[symbol].trades.unshift({ date: fmtdate(tick[i].data.date).getTime(), rate: parseFloat(tick[i].data.rate), amount: parseFloat(tick[i].data.amount) });
-                    env.history[symbol].last = parseFloat(parseFloat(tick[i].data.rate));
+                    env.history[symbol].trades = env.history[symbol].trades.sort(fnsort);
+                    env.history[symbol].last = env.history[symbol].trades[0].rate;
+                    console.log(new Date().toLocaleString(), 'newTrade', clc.yellow(symbol + ' LAST'), JSON.stringify(env.history[symbol].last.toFixed(6)));
                     history = true;
                 } else {
                     console.log('unkown', tick[i].type);
@@ -134,7 +135,9 @@ env.connect = function connect(symbols) {
             console.log('market error', e, e.stack);
         }
     }, function (tick) {
-        var i, history = false;
+        return;
+        /*
+        var i, history = false, symbol, fnsort = function (a, b) { return a.date > b.date ? -1 : 1; };
         // ['BTC_BBR','0.00069501','0.00074346','0.00069501','-0.00742634','8.63286802','11983.47150109',0,'0.00107920','0.00045422']
         // currencyPair, last, lowestAsk, highestBid, percentChange, baseVolume, quoteVolume, isFrozen, 24hrHigh, 24hrLow
         
@@ -145,6 +148,7 @@ env.connect = function connect(symbols) {
         try {
             for (i = 0; i < config.markets.length; i++) {
                 history = false;
+                symbol = config.markets[i];
                 
                 if (env.history === undefined || env.history[config.markets[i]] === undefined || env.history[config.markets[i]].last === undefined) {
                     
@@ -153,9 +157,10 @@ env.connect = function connect(symbols) {
                 }
                 
                 if (tick[0] === config.markets[i] && env.history[config.markets[i]].last !== parseFloat(tick[1])) {
-                    console.log(new Date().toLocaleString(), clc.yellow('Tick'), config.markets[i], parseFloat(tick[1]));
                     env.history[config.markets[i]].trades.unshift({ date: new Date().getTime(), rate: parseFloat(tick[1]), amount: 1 });
-                    env.history[config.markets[i]].last = parseFloat(tick[1]);
+                    env.history[symbol].trades = env.history[symbol].trades.sort(fnsort);
+                    env.history[symbol].last = env.history[symbol].trades[0].rate;
+                    console.log(new Date().toLocaleString(), 'ticker  ', clc.yellow(symbol + ' LAST'), JSON.stringify(env.history[symbol].last.toFixed(6)));
                     history = true;
 
                 }
@@ -167,6 +172,7 @@ env.connect = function connect(symbols) {
         } catch (e) {
             console.log('ticker error', e, e.stack);
         }
+        */
     });
 };
 
@@ -369,8 +375,8 @@ env.updateHistory = function updateHistory(callback, symbol) {
                 result.push({ date: fmtdate(trades[i].date).getTime(), rate: parseFloat(trades[i].rate), amount: parseFloat(trades[i].amount) });
             }
             
-            env.history[symbol].trades = result;
-            env.history[symbol].last = trades[0].rate;
+            env.history[symbol].trades = result.sort(function (a, b) { return a.date > b.date ? -1 : 1; });
+            env.history[symbol].last = env.history[symbol].trades[0].rate;
         }
         publisher.publish(symbol + '.history', JSON.stringify(env.history[symbol]));
         callback('took ' + ((new Date().getTime() - start) / 1000) + 's');
